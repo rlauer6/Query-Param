@@ -7,11 +7,32 @@ query strings
 
     use Query::Param;
 
-    my $args = Query::Param->new("foo=1&bar=2&bar=3");
+    my $args = Query::Param->new("foo=1&bar=2&bar=3&empty=&encoded=%25+%2B");
 
     # Object-style access
-    my $foo = $args->get("foo");      # "1"
-    my $bar = $args->get("bar");      # ["2", "3"]
+    my $foo     = $args->get("foo");         # scalar: "1"
+    my $bar     = $args->get("bar");         # arrayref: ["2", "3"]
+    my $encoded = $args->get("encoded");     # scalar: "% +"
+
+    # CGI-style access
+    my $foo_again = $args->param("foo");     # same as get("foo")
+    my @keys      = $args->param;            # all parameter names
+
+    # Get all decoded parameters
+    my $all = $args->params;                 # { foo => "1", bar => ["2", "3"], ... }
+
+    # Legacy-compatible flat hash
+    my $vars = $args->Vars;                  # { foo => "1", bar => "3", ... }
+
+    # Check for presence
+    if ( $args->has("bar") ) { ... }
+
+    # Update or add parameters
+    $args->set("foo", "updated");
+    $args->set("new", "value");
+
+    # Get query string back
+    my $str = $args->to_string;              # bar=2&bar=3&empty=&encoded=%25%20%2B&foo=updated&new=value
 
 # DESCRIPTION
 
@@ -62,6 +83,28 @@ wheel?
     - Hash::MultiValue works but lacks parsing logic - and doesn't
     round-trip.
 
+# CGI COMPATIBILITY
+
+This module supports key methods from [CGI](https://metacpan.org/pod/CGI) for interoperability:
+
+- `param()` - scalar or arrayref return, regardless of context
+- `Vars()` - returns a hashref of flattened scalar values (last-value wins)
+- `get()` - equivalent to `param($key)`
+- `params()` - returns a hashref retaining all values (including
+arrayrefs)
+- `to_string()` - round-trips encoded input with full fidelity
+
+**Note**: Unlike CGI.pm, `param()` and `get()` do not change behavior
+depending on context. They always return a scalar (if one value) or an
+arrayref (if multiple values). This avoids subtle bugs and improves
+predictability.
+
+# THREAD SAFETY
+
+This module does not use any global state. It is safe to use in
+threaded, embedded, and reentrant environments such as mod\_perl,
+Plack, or inside event loops.
+
 # CONSTRUCTOR
 
 ## new
@@ -97,6 +140,36 @@ Returns the keys or names of the query string parameters.
 Returns a list of array references that contain key/value pairs in the
 same vein as `List::Util::pairs`.
 
+## param
+
+    my @names = $q->param;
+    my $value = $q->param('key');
+
+Returns the list of all parameter names when called with no arguments.
+
+When called with a key, returns the value for that parameter. If the
+parameter occurred multiple times in the original query string,
+returns an array reference of values. Otherwise, returns a scalar
+value.
+
+This method is provided for compatibility with `CGI-`param>, but
+unlike CGI.pm, it always returns a scalar or array reference
+regardless of context. Internally, it delegates to `get()`.
+
+## params
+
+    my $hashref = $q->params;
+
+Returns a hash reference containing all decoded parameters.
+
+Each key corresponds to a parameter name. The value is either a scalar
+(if the parameter had a single value) or an array reference (if the
+parameter occurred multiple times).
+
+This method is intended as a replacement for `CGI-`Vars> and provides
+a consistent view of all parameters for inspection, testing, or
+export.
+
 ## set
 
 Sets a query string parameter.
@@ -105,7 +178,19 @@ Sets a query string parameter.
 
 Creates an query string from the parsed or set parameters.
 
-## values
+## Vars
+
+    my $vars = $q->Vars;
+
+Returns a hash reference where each key maps to a scalar value.
+
+If a parameter occurred multiple times in the query string, only the
+last value is preserved - consistent with `CGI-`Vars>, but
+potentially lossy.
+
+This method is provided for compatibility with legacy code that
+expects flattened query strings. Use `params()` instead to retain
+full value lists and avoid silent data loss.
 
 # DEPENDENCIES
 

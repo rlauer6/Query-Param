@@ -5,7 +5,7 @@ use warnings;
 
 use URI::Escape qw(uri_unescape);
 
-our $VERSION = '0.01';
+our $VERSION = '0.02';
 
 ########################################################################
 sub new {
@@ -25,6 +25,43 @@ sub new {
   }
 
   return $self;
+}
+
+########################################################################
+sub Vars {
+########################################################################
+  my ($self) = @_;
+  my %vars;
+
+  for my $key ( $self->keys ) {
+    my $val = $self->get($key);
+    $vars{$key} = ref $val eq 'ARRAY' ? $val->[-1] : $val;
+  }
+
+  return \%vars;
+}
+
+########################################################################
+sub param {
+########################################################################
+  my ( $self, $key ) = @_;
+
+  return $self->keys if !defined $key;
+  return $self->get($key);
+}
+
+########################################################################
+sub params {
+########################################################################
+  my ($self) = @_;
+  my %out;
+
+  for my $key ( $self->keys ) {
+    my $val = $self->get($key);
+    $out{$key} = $val;
+  }
+
+  return \%out;
 }
 
 ########################################################################
@@ -145,11 +182,32 @@ query strings
 
   use Query::Param;
 
-  my $args = Query::Param->new("foo=1&bar=2&bar=3");
+  my $args = Query::Param->new("foo=1&bar=2&bar=3&empty=&encoded=%25+%2B");
 
   # Object-style access
-  my $foo = $args->get("foo");      # "1"
-  my $bar = $args->get("bar");      # ["2", "3"]
+  my $foo     = $args->get("foo");         # scalar: "1"
+  my $bar     = $args->get("bar");         # arrayref: ["2", "3"]
+  my $encoded = $args->get("encoded");     # scalar: "% +"
+
+  # CGI-style access
+  my $foo_again = $args->param("foo");     # same as get("foo")
+  my @keys      = $args->param;            # all parameter names
+
+  # Get all decoded parameters
+  my $all = $args->params;                 # { foo => "1", bar => ["2", "3"], ... }
+
+  # Legacy-compatible flat hash
+  my $vars = $args->Vars;                  # { foo => "1", bar => "3", ... }
+
+  # Check for presence
+  if ( $args->has("bar") ) { ... }
+
+  # Update or add parameters
+  $args->set("foo", "updated");
+  $args->set("new", "value");
+
+  # Get query string back
+  my $str = $args->to_string;              # bar=2&bar=3&empty=&encoded=%25%20%2B&foo=updated&new=value
 
 =head1 DESCRIPTION
 
@@ -250,6 +308,46 @@ round-trip.
 
 =back
 
+=head1 CGI COMPATIBILITY
+
+This module supports key methods from L<CGI> for interoperability:
+
+=over 4
+
+=item *
+
+C<param()> - scalar or arrayref return, regardless of context
+
+=item *
+
+C<Vars()> - returns a hashref of flattened scalar values (last-value wins)
+
+=item *
+
+C<get()> - equivalent to C<param($key)>
+
+=item *
+
+C<params()> - returns a hashref retaining all values (including
+arrayrefs)
+
+=item *
+
+C<to_string()> - round-trips encoded input with full fidelity
+
+=back
+
+B<Note>: Unlike CGI.pm, C<param()> and C<get()> do not change behavior
+depending on context. They always return a scalar (if one value) or an
+arrayref (if multiple values). This avoids subtle bugs and improves
+predictability.
+
+=head1 THREAD SAFETY
+
+This module does not use any global state. It is safe to use in
+threaded, embedded, and reentrant environments such as mod_perl,
+Plack, or inside event loops.
+
 =head1 CONSTRUCTOR
 
 =head2 new
@@ -285,6 +383,36 @@ Returns the keys or names of the query string parameters.
 Returns a list of array references that contain key/value pairs in the
 same vein as C<List::Util::pairs>.
 
+=head2 param
+
+  my @names = $q->param;
+  my $value = $q->param('key');
+
+Returns the list of all parameter names when called with no arguments.
+
+When called with a key, returns the value for that parameter. If the
+parameter occurred multiple times in the original query string,
+returns an array reference of values. Otherwise, returns a scalar
+value.
+
+This method is provided for compatibility with C<CGI->param>, but
+unlike CGI.pm, it always returns a scalar or array reference
+regardless of context. Internally, it delegates to C<get()>.
+
+=head2 params
+
+  my $hashref = $q->params;
+
+Returns a hash reference containing all decoded parameters.
+
+Each key corresponds to a parameter name. The value is either a scalar
+(if the parameter had a single value) or an array reference (if the
+parameter occurred multiple times).
+
+This method is intended as a replacement for C<CGI->Vars> and provides
+a consistent view of all parameters for inspection, testing, or
+export.
+
 =head2 set
 
 Sets a query string parameter.
@@ -293,7 +421,19 @@ Sets a query string parameter.
 
 Creates an query string from the parsed or set parameters.
 
-=head2 values
+=head2 Vars
+
+  my $vars = $q->Vars;
+
+Returns a hash reference where each key maps to a scalar value.
+
+If a parameter occurred multiple times in the query string, only the
+last value is preserved - consistent with C<CGI->Vars>, but
+potentially lossy.
+
+This method is provided for compatibility with legacy code that
+expects flattened query strings. Use C<params()> instead to retain
+full value lists and avoid silent data loss.
 
 =head1 DEPENDENCIES
 
