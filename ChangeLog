@@ -1,0 +1,17 @@
+Thu Jun  5 10:19:28 2025  Rob Lauer  <rlauer6@comcast.net>
+
+	[BigBang]:
+	* .gitignore: new
+	* ChangeLog: new
+	* Makefile: new
+	* Query-Param-0.01.tar.gz: new
+	* README.md: new
+	* buildspec.yml: new
+	* extra-files: new
+	* lib/Query/Param.pm: new
+	* requires: new
+	* t/query-param.t: new
+	* test-requires: new
+
+
+
