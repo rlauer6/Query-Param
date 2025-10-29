@@ -1,7 +1,7 @@
 # NAME
 
 Query::Param - Lightweight object interface for parsing and creating
-query strings
+query strings and form parameters
 
 # SYNOPSIS
 
@@ -113,6 +113,21 @@ Plack, or inside event loops.
 
 Parses the provided query string and returns a new
 `Query::Param` object.
+
+## new\_from\_request
+
+    my $args = Query::Param->new_from_request;
+
+Parses query strings, application/x-www-form-urlencoded, or
+multipart/form-data from HTTP requests.  Assumes environment variables
+CONTENT\_TYPE, CONTENT\_LENGTH, REQUEST\_METHOD have been set.
+
+_NOTE: Reminder - this is a lightweight parser! It does not support
+file downloads when data is passed as multipart/form-data._
+
+If the content type is application/json the parser will decode the
+payload. You can retrieve the raw payload using the `to_string`
+method or individual keys of the payload using `get()`.
 
 # METHODS AND SUBROUTINES
 

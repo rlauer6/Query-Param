@@ -1,4 +1,6 @@
+*.tmp
 *.tar.gz
 provides
 resources
 extrafiles
+lib/Query/Param.pm
